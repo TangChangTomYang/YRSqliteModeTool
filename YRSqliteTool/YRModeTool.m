@@ -18,6 +18,7 @@
     #ifdef DEBUG
     if(![cls  respondsToSelector:@selector(modifyPrimaryKey)]){
         NSLog(@"警告!!! %@ 类必须遵守YRSqliteModeProtocol协议,实现 +(NSString *)modifyPrimaryKey 方法",cls);
+       return  nil;
     }
     #endif
     return  NSStringFromClass(cls);
@@ -28,6 +29,7 @@
     #ifdef DEBUG
     if(![cls  respondsToSelector:@selector(modifyPrimaryKey)]){
         NSLog(@"警告!!! %@ 类必须遵守YRSqliteModeProtocol协议,实现 +(NSString *)modifyPrimaryKey 方法",cls);
+        return  nil;
     }
     #endif
     return  [NSString stringWithFormat:@"%@_temp",NSStringFromClass(cls)];
@@ -49,7 +51,6 @@
     Class cls = [mode class];
     NSDictionary *nameSqliteTypeDic = [self classIvarNameSqliteTypeDic:cls];
     NSArray *allNameArr = nameSqliteTypeDic.allKeys;
-    
     NSDictionary *defaultValueDic = [self sqliteTypeDefaultValueDic];
     
     for (NSString *name  in allNameArr) {
@@ -106,6 +107,7 @@
     #ifdef DEBUG
     if(![cls  respondsToSelector:@selector(modifyPrimaryKey)]){
          NSLog(@"警告!!! %@ 类必须遵守YRSqliteModeProtocol协议,实现 +(NSString *)modifyPrimaryKey 方法",cls);
+        return nil;
     }
     // 支持的所有数据类型
     NSArray<NSString *> *suportRuntimeTypeArr = [self runtimeTypeMapSqliteTypeDic].allKeys;
@@ -143,7 +145,7 @@
                 if([testName isEqualToString:lowercaseIvarName]){
                     isNameDuplicateDefinition = YES;
                     NSLog(@"警告!!! %@ 类的 %@ 成员变量 重复定义,数据可能丢失",cls,ivarName);
-                    continue;
+                    return nil;
                 }
             }
             if(isNameDuplicateDefinition == NO){
@@ -164,6 +166,7 @@
         #ifdef DEBUG
             if(![suportRuntimeTypeArr containsObject:ivarType]){
                 NSLog(@"警告!!! %@ 类中 包含不支持的数据类型: %@",cls,ivarType);
+                return nil;
             }
         #endif
         dicM[ivarName] = ivarType;
@@ -174,6 +177,7 @@
         NSString *modifyPriKey = [cls modifyPrimaryKey];
         if (![testNameArrM containsObject:modifyPriKey]) {
             NSLog(@"警告!!! %@ 类,+(NSString *)modifyPrimaryKey 方法,返回值必须是 %@ 中的一个",cls,[testNameArrM componentsJoinedByString:@","]);
+            return nil;
         }
     }
     #endif

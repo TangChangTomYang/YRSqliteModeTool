@@ -51,9 +51,10 @@
     
     YRTest *testMode = [YRTest new];
     testMode.name = @"wangwu";
-    testMode.num = 12;
-    testMode.age = 20;
-    testMode.height = 1.78;
+    testMode.num = 22;
+    testMode.age122 = 20;
+    testMode.height1 = 1.78;
+    testMode.isMan1 = YES;
 //    testMode.data = nil;
    BOOL isSave = [YRSqliteModeTool saveOrUpdateMode:testMode uid:@"yangrui"];
      NSLog(@"isSave: %d",isSave);

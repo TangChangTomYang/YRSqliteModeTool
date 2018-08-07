@@ -19,6 +19,7 @@
 +(BOOL)createTable:(Class)cls uid:(NSString *)uid{
     
     NSString *tableName = [YRModeTool tableName:cls];
+    
     NSString *primaryKey = [YRModeTool defaultPrimaryKeyColumn];
     NSString *columnNameTypeStr = [YRModeTool columnNameAndSqliteTypeStr:cls];
     NSString *createTableSql = [NSString stringWithFormat:@"create table if not exists %@(%@,%@);",tableName,primaryKey, columnNameTypeStr];
@@ -66,13 +67,16 @@
         return YES;
     }
     #ifdef DEBUG
-        NSLog(@"正在更新 数据库表: %@ ...",cls);
+        NSLog(@"正在更新 数据库表结构: %@ ...",cls);
     #endif
 
     NSMutableArray<NSString *>*sqlArrM = [NSMutableArray array];
     
     //1. 创建临时表
     NSString *tempTableName = [YRModeTool tempTableName:cls];
+    if(tempTableName.length == 0){
+        return NO;
+    }
     NSString *createTempTableSql = [NSString stringWithFormat:@"create table if not exists %@(%@,%@);",tempTableName,[YRModeTool defaultPrimaryKeyColumn], [YRModeTool columnNameAndSqliteTypeStr:cls]];
     [sqlArrM addObject:createTempTableSql];
     
@@ -96,6 +100,7 @@
     
     for(NSString *newName in newNameArr){
         
+        //1. 先检查是否有需要替换的字段
         NSString *oldName = newName;
         NSString *needChangeOldName = changeNameDic[newName];
         if (needChangeOldName.length > 0) {
@@ -106,29 +111,56 @@
             
             NSString *newNameType = modeNameTypeDic[newName];
             NSString *oldNameType = tableNameTypeDic[oldName];
+            
             if([newNameType isEqualToString:oldNameType]){
-                
                 NSString *updateColumnSql = [NSString stringWithFormat:@"update %@ set %@ = (select %@ from %@ where %@.%@ = %@.%@);",tempTableName, newName, oldName, tableName,  tempTableName,primaryKey ,  tableName,primaryKey];
                 [sqlArrM addObject:updateColumnSql];
             }
             else{// 字段名有变化 字段类型没匹配上
+                
                 if(needChangeOldName.length > 0){
                     #ifdef DEBUG
-                        // 需要有版本映射关系
-                        NSLog(@"警告!!! 在数据库修改字段名时, 旧字段名: %@ 新字段:%@, 类型不匹配, 旧类型: %@ 新类型: %@ 请确认, 数据可能丢失",oldName ,newName,oldNameType,newNameType  );
+                    // 需要有版本映射关系
+                    NSLog(@"警告!!! 在数据库修改字段名时, 旧字段名: %@ 新字段:%@, 类型不匹配, 旧类型: %@ 新类型: %@ 请确认, 数据可能丢失",oldName ,newName,oldNameType,newNameType  );
+                    return NO;
                     #endif
                 }
-          }
+            }
         }
         else{
             
-            if(needChangeOldName.length > 0){
-                #ifdef DEBUG
+            if([oldNameArr containsObject:newName]){ // 上次替换过了次字段,这次就不替换了 直接导数据
+                oldName = newName;
+                NSString *newNameType = modeNameTypeDic[newName];
+                NSString *oldNameType = tableNameTypeDic[oldName];
+                
+                if([newNameType isEqualToString:oldNameType]){
+                    NSString *updateColumnSql = [NSString stringWithFormat:@"update %@ set %@ = (select %@ from %@ where %@.%@ = %@.%@);",tempTableName, newName, oldName, tableName,  tempTableName,primaryKey ,  tableName,primaryKey];
+                    [sqlArrM addObject:updateColumnSql];
+                }
+                else{// 字段名有变化 字段类型没匹配上
+                    
+                    if(needChangeOldName.length > 0){
+                        #ifdef DEBUG
+                        // 需要有版本映射关系
+                        NSLog(@"警告!!! 在数据库修改字段名时, 旧字段名: %@ 新字段:%@, 类型不匹配, 旧类型: %@ 新类型: %@ 请确认, 数据可能丢失",oldName ,newName,oldNameType,newNameType  );
+                        return NO;
+                        #endif
+                    }
+                }
+            }
+            else{
+                if(needChangeOldName.length > 0){
+                    #ifdef DEBUG
                     // 需要有版本映射关系
                     NSLog(@"警告!!! 在数据库修改字段名时,新字段:%@, 没找到对应的旧字段: %@  请确认,数据可能丢失",newName,oldName);
-                #endif
+                    return NO;
+                    #endif
+                }
             }
         }
+        
+        
       
     }
     
@@ -143,7 +175,10 @@
     BOOL rst = [YRSqliteTool dealSqlArr:sqlArrM uid:uid];
     #ifdef DEBUG
         if (rst == NO ) {
-            NSLog(@"%@,%@ 更新数据迁移表失败",cls, uid);
+            NSLog(@"%@,%@ 更新数据迁移表  失败",cls, uid);
+        }
+        else{
+           NSLog(@"%@,%@ 更新数据迁移表  成功",cls, uid);
         }
     #endif
     return rst;
@@ -201,6 +236,7 @@
     //2. 更新所有的表 if need
     for (Class cls in clsArrM) {
         BOOL rst = [self prepareAccessTable:cls uid:uid];
+        
         if (rst == NO) {
             return NO;
         }
@@ -208,7 +244,7 @@
     
     //3. 更新或插入所有的数据 (一条一条 防止前后 同一条记录)
     for (id mode in modeArr) {
-        NSString *updateOrInserSql = [self updateOrInsertSql:mode uid:uid];;
+        NSString *updateOrInserSql = [self fetchUpdateOrInsertSql:mode uid:uid];;
         BOOL rst =  [YRSqliteTool dealSql:updateOrInserSql uid:uid];
         if (rst == NO) {
             return NO;
@@ -221,9 +257,9 @@
 #pragma mark- 私有方法
 
 
-+(NSString *)updateOrInsertSql:(id)mode uid:(NSString *)uid{
++(NSString *)fetchUpdateOrInsertSql:(id)mode uid:(NSString *)uid{
     Class cls = [mode class];
-    NSString *updateOrInserSql = nil;
+    NSString *updateOrInserColumnSql = nil;
     
     //3. 判断记录是否存在,存在执行更新,不存在执行插入语句
     NSMutableArray<NSMutableDictionary *> *dicArrM =  [self queryTable:cls uid:uid];
@@ -249,7 +285,7 @@
         
         
         NSString *updateSql = [NSString stringWithFormat:@"update %@ set %@ where %@='%@';",tableName,setStr,primaryKey,nameValueDic[primaryKey]];
-        updateOrInserSql = updateSql;
+        updateOrInserColumnSql = updateSql;
     }
     else{
         // 插入
@@ -264,9 +300,9 @@
         NSString *namesStr = [NSString stringWithFormat:@"(%@)",[nameArrM componentsJoinedByString:@","]];
         NSString *valuesStr = [NSString stringWithFormat:@"('%@')",[valueArrM componentsJoinedByString:@"','"]];
         NSString *insertSql = [NSString stringWithFormat:@"insert into %@ %@ values %@;",tableName, namesStr, valuesStr];
-        updateOrInserSql = insertSql;
+        updateOrInserColumnSql = insertSql;
     }
-    return updateOrInserSql;
+    return updateOrInserColumnSql;
 }
 /** 对 数据库进行 增 查 删 改 前 要对数据库的表状态进行 确认*/
 +(BOOL)prepareAccessTable:(Class)cls  uid:(NSString *)uid{
@@ -280,7 +316,7 @@
     }
     
     //2. 检测表格是否需要更新,需要就更新
-    if(![self isModeNeedUpdateTable:cls uid:uid]){
+    if([self isModeNeedUpdateTable:cls uid:uid]){
         BOOL rst2 =  [self updateTable:cls uid:uid];
         if(rst2 == NO){
             return NO;

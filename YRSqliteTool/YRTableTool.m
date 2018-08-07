@@ -19,6 +19,7 @@
     #ifdef DEBUG
     if(![cls  respondsToSelector:@selector(modifyPrimaryKey)]){
         NSLog(@"警告!!! %@ 类必须遵守YRSqliteModeProtocol协议,实现 +(NSString *)modifyPrimaryKey 方法",cls);
+        return nil;
     }
     #endif
     
@@ -74,11 +75,15 @@
     #ifdef DEBUG
     if(![cls  respondsToSelector:@selector(modifyPrimaryKey)]){
         NSLog(@"警告!!! %@ 类必须遵守YRSqliteModeProtocol协议,实现 +(NSString *)modifyPrimaryKey 方法",cls);
+        return nil;
     }
     #endif
    
     // 获取Class 对应的数据库的表
     NSString *tableName = [YRModeTool tableName:cls];
+    if(tableName.length == 0){
+        return nil;
+    }
     //查询创建 .tableName 对应的数据库表 的sql 语句,里面包含了 字段名和字段类型等信息
     //因为数据库创建表的sql 语句都存储在sqlite_master 这张隐藏的表里面
     NSString *queryCreateTableSql =  [NSString stringWithFormat: @"select sql from sqlite_master where type = 'table' and name = '%@';", tableName];

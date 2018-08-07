@@ -14,9 +14,9 @@
 
 
 @property(nonatomic, assign)int num;
-@property(nonatomic, assign)int  age;
-@property(nonatomic, assign)float height;
-@property(nonatomic, assign)BOOL isMan;
+@property(nonatomic, assign)int  age122;
+@property(nonatomic, assign)float height1;
+@property(nonatomic, assign)BOOL isMan1;
 @property(nonatomic, strong)NSString *name;
 //@property(nonatomic, strong)NSData *data;
 
