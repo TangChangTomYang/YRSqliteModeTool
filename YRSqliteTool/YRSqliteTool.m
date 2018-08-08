@@ -76,6 +76,9 @@ static sqlite3 *_db = nil;
  */
 +(NSMutableArray<NSMutableDictionary *> *)querySql:(NSString *)sql uid:(NSString *)uid{
     
+    if (sql.length == 0) {
+        return nil;
+    }
     return  [self querySqlArr:@[sql] uid:uid].firstObject;
 }
 
@@ -96,12 +99,14 @@ static sqlite3 *_db = nil;
         }
         
         NSMutableArray *arrMArrM = [NSMutableArray array];
-        
         for(int i = 0 ; i < sqlArr.count; i ++){
             //2. 执行DQL 语句
             NSString *sql = sqlArr[i];
             NSMutableArray<NSMutableDictionary *> *arrM = [self querySql:sql withinDb:_db];
-            if(arrM != nil)  [arrMArrM addObject: arrM];
+            if(arrM.count > 0){
+                [arrMArrM addObject: arrM];
+            }
+            
         }
         
         //3. 关闭数据库

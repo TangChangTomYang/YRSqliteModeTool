@@ -39,4 +39,6 @@
 +(NSMutableDictionary *)ivarNameValueDicOfMode:(id)mode;
 
 
+/** 直接将 dic 装换成对应的模型*/
++(id)modeOfClass:(Class)cls fromDic:(NSDictionary *)dic;
 @end

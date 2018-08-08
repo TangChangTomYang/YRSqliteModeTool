@@ -34,12 +34,23 @@ typedef enum {
 
 
 #pragma mark- sqlite 增 查 删 改 相关
+
 +(BOOL)saveOrUpdateMode:(id)mode uid:(NSString *)uid;
 +(BOOL)saveOrUpdateModeArr:(NSArray *)modeArr uid:(NSString *)uid;
 
+/** 返回的是 cls 对应的模型数组*/
++(NSMutableArray *)queryModeInTable:(Class)cls uid:(NSString *)uid;
++(NSMutableArray *)queryModeInTable:(Class)cls columnName:(NSString *)columnName  relation:(YRSqliteRelation)relation  value:(id)value uid:(NSString *)uid;
++(NSMutableArray *)queryModeInTable:(Class)cls columnNameArr:(NSArray<NSString *> *)columnNameArr  relationArr:(NSArray<NSNumber *> *)relationArr  valueArr:(NSArray *)valueArr uid:(NSString *)uid;
 
-+(NSMutableArray<NSMutableDictionary *> *)queryTable:(Class)cls uid:(NSString *)uid;
 
-+(NSMutableArray<NSMutableDictionary *> *)queryTable:(Class)cls columnName:(NSString *)columnName  relation:(YRSqliteRelation)relation  value:(id)value uid:(NSString *)uid;
++(BOOL)deleteMode:(id)mode uid:(NSString *)uid;
++(BOOL)deleteModeArr:(NSArray *)modeArr uid:(NSString *)uid;
+
++(BOOL)deleteModeInTabel:(Class)cls uid:(NSString *)uid;
++(BOOL)deleteModeInTabel:(Class)cls columnName:(NSString *)columnName  relation:(YRSqliteRelation)relation  value:(id)value uid:(NSString *)uid;
++(BOOL)deleteModeInTabel:(Class)cls columnNameArr:(NSArray<NSString *> *)columnNameArr  relationArr:(NSArray<NSNumber *> *)relationArr  valueArr:(NSArray *)valueArr uid:(NSString *)uid;
+
+
 
 @end

@@ -19,9 +19,13 @@
 +(BOOL)createTable:(Class)cls uid:(NSString *)uid{
     
     NSString *tableName = [YRModeTool tableName:cls];
-    
     NSString *primaryKey = [YRModeTool defaultPrimaryKeyColumn];
     NSString *columnNameTypeStr = [YRModeTool columnNameAndSqliteTypeStr:cls];
+    if (tableName.length == 0 ||
+        primaryKey.length == 0 ||
+        columnNameTypeStr.length == 0) {
+        return NO;
+    }
     NSString *createTableSql = [NSString stringWithFormat:@"create table if not exists %@(%@,%@);",tableName,primaryKey, columnNameTypeStr];
     return [YRSqliteTool dealSql:createTableSql uid:uid];
 }
@@ -67,7 +71,7 @@
         return YES;
     }
     #ifdef DEBUG
-        NSLog(@"正在更新 数据库表结构: %@ ...",cls);
+    NSLog(@"正在更新 数据库表结构: %@ ...",cls);
     #endif
 
     NSMutableArray<NSString *>*sqlArrM = [NSMutableArray array];
@@ -82,6 +86,9 @@
     
     //2.根据主键插入数据到临时表
     NSString *tableName = [YRModeTool tableName:cls];
+    if(tableName.length == 0){
+        return NO;
+    }
     NSString *primaryKey = kPrimaryKeyName;
     NSString *inserPrimarySql = [NSString stringWithFormat:@"insert into %@(%@) select %@ from %@;",tempTableName,primaryKey,primaryKey,tableName];
     [sqlArrM addObject:inserPrimarySql];
@@ -186,39 +193,81 @@
 
 
 /** 查询所有的记录 */
-+(NSMutableArray<NSMutableDictionary *> *)queryTable:(Class)cls uid:(NSString *)uid{
-  return   [self queryTable:cls columnName:nil relation:0 value:nil uid:uid];
++(NSMutableArray *)queryModeInTable:(Class)cls uid:(NSString *)uid{
+    
+   return [self queryModeInTable:cls columnName:nil relation:0 value:nil uid:uid];
 }
 
-
 /** 查询数据中满足条件的记录*/
-+(NSMutableArray<NSMutableDictionary *> *)queryTable:(Class)cls
-                                          columnName:(NSString *)columnName
-                                            relation:(YRSqliteRelation)relation
-                                               value:(id)value
-                                                 uid:(NSString *)uid{
++(NSMutableArray *)queryModeInTable:(Class)cls columnName:(NSString *)columnName  relation:(YRSqliteRelation)relation value:(id)value  uid:(NSString *)uid{
+    if (columnName.length ==  0 && value == nil) {
+        return  [self queryModeInTable:cls columnNameArr:nil relationArr:nil valueArr:nil uid:uid];
+    }
+    
+    if (columnName.length >  0 && value ) {
+        return  [self queryModeInTable:cls columnNameArr:@[columnName] relationArr:@[@(relation)] valueArr:@[value] uid:uid];
+    }
+    return nil;
+    
    
+}
+
++(NSMutableArray *)queryModeInTable:(Class)cls columnNameArr:(NSArray<NSString *> *)columnNameArr  relationArr:(NSArray<NSNumber *> *)relationArr  valueArr:(NSArray *)valueArr uid:(NSString *)uid{
     
     BOOL rst = [self prepareAccessTable:cls uid:uid];
     if (rst == NO) {
         return nil;
     }
-    NSString *tableName = [YRModeTool tableName:cls];
-    NSString *relationStr = [self relationDic][@(relation)];
-    NSString *querySql = nil;
-    if(columnName.length > 0 && value != nil){
-        querySql = [NSString stringWithFormat:@"select * from %@ where %@ %@ '%@';",tableName,columnName,relationStr, value  ];
+    
+    
+    if (!(columnNameArr.count == relationArr.count  && relationArr.count == valueArr.count)) {
+        return nil;
     }
-    else{
+    
+    NSString *tableName = [YRModeTool tableName:cls];
+    if (tableName.length == 0) {
+        return nil;
+    }
+    
+    NSMutableArray<NSString *> *columnRelationArrM = [NSMutableArray array];
+    NSDictionary *relationDic  = [self relationDic];
+    for(int i= 0 ; i < columnNameArr.count ; i++){
+        NSString *name = columnNameArr[i];
+        NSString *relationStr = relationDic[relationArr[i]];
+        id value = valueArr[i];
+        NSString *columnRelation = [NSString stringWithFormat:@"%@ %@ '%@'",name,relationStr,value ];
+        [columnRelationArrM addObject:columnRelation];
+    }
+    
+    NSString *querySql = nil;
+    if (columnRelationArrM.count == 0) {
         querySql = [NSString stringWithFormat:@"select * from %@;",tableName];
     }
     
-   return [YRSqliteTool querySql:querySql uid:uid];
+    if (columnRelationArrM.count == 1) {
+        
+         querySql = [NSString stringWithFormat:@"select * from %@ where %@;",tableName,columnRelationArrM.firstObject  ];
+    }
+    
+    if (columnRelationArrM.count > 1) {
+        querySql =  [NSString stringWithFormat:@"select * from %@ where %@;",tableName,[columnRelationArrM componentsJoinedByString:@" and "]];
+    }
+    
+    NSMutableArray<NSMutableDictionary *> *dicArrM = [YRSqliteTool querySql:querySql uid:uid];
+    if (dicArrM.count > 0) {
+        NSMutableArray *modeArrM = [NSMutableArray array];
+        for(NSDictionary *dic in dicArrM){
+          [modeArrM addObject:  [YRModeTool modeOfClass:cls fromDic:dic]];
+        }
+        return modeArrM;
+        
+    }
+   return nil ;
 }
 
 
 +(BOOL)saveOrUpdateMode:(id)mode uid:(NSString *)uid{
-    
+
    return  [self saveOrUpdateModeArr:@[mode] uid:uid];
 }
 
@@ -234,17 +283,17 @@
     }
     
     //2. 更新所有的表 if need
-    for (Class cls in clsArrM) {
-        BOOL rst = [self prepareAccessTable:cls uid:uid];
-        
-        if (rst == NO) {
-            return NO;
-        }
+    BOOL rst = [self prepareAccessTableArr:clsArrM uid:uid];
+    if (rst == NO) {
+        return NO;
     }
     
     //3. 更新或插入所有的数据 (一条一条 防止前后 同一条记录)
     for (id mode in modeArr) {
-        NSString *updateOrInserSql = [self fetchUpdateOrInsertSql:mode uid:uid];;
+        NSString *updateOrInserSql = [self fetchUpdateOrInsertSql:mode uid:uid];
+        if (updateOrInserSql.length == 0) {
+            return NO;
+        }
         BOOL rst =  [YRSqliteTool dealSql:updateOrInserSql uid:uid];
         if (rst == NO) {
             return NO;
@@ -253,24 +302,125 @@
     return YES;
 }
 
++(BOOL)deleteMode:(id)mode uid:(NSString *)uid{
+    
+    return  [self deleteModeArr:@[mode] uid:uid];
+}
+
++(BOOL)deleteModeArr:(NSArray *)modeArr uid:(NSString *)uid{
+    //1. 取出所有的类
+    NSMutableArray *clsArrM = [NSMutableArray array];
+    for (id mode in modeArr) {
+        Class cls = [mode class];
+        if (![clsArrM containsObject:cls]) {
+            [clsArrM addObject:cls];
+        }
+    }
+    
+    //2. 更新所有的表 if need
+    BOOL rst = [self prepareAccessTableArr:clsArrM uid:uid];
+    if (rst == NO) {
+        return NO;
+    }
+    
+    //delete from table where pri = 'pri'
+    NSMutableArray *deleteSqlArrM = [NSMutableArray array];
+    for (id mode  in modeArr) {
+        Class cls = [mode class];
+        NSString *tableName = [YRModeTool tableName:cls];
+        if (tableName.length == 0) {
+            return NO;
+        }
+        NSString *modifyPrimaryKey = [cls modifyPrimaryKey];
+        id value = [mode valueForKeyPath:modifyPrimaryKey];
+        if (value == nil) {
+            return NO;
+        }
+        NSString *deleteSql = [NSString stringWithFormat:@"delete from %@ where %@ = '%@'",tableName,modifyPrimaryKey,value ];
+        [deleteSqlArrM addObject:deleteSql];
+    }
+    
+   return  [YRSqliteTool dealSqlArr:deleteSqlArrM uid:uid];
+
+}
+
++(BOOL)deleteModeInTabel:(Class)cls uid:(NSString *)uid{
+    return [self deleteModeInTabel:cls columnName:nil relation:0 value:nil uid:uid];
+}
+
++(BOOL)deleteModeInTabel:(Class)cls columnName:(NSString *)columnName  relation:(YRSqliteRelation)relation  value:(id)value uid:(NSString *)uid{
+    if (columnName.length ==  0 && value == nil) {
+       return  [self deleteModeInTabel:cls columnNameArr:nil relationArr:nil valueArr:nil uid:uid];
+    }
+    
+    if (columnName.length >  0 && value ) {
+        return  [self deleteModeInTabel:cls columnNameArr:@[columnName] relationArr:@[@(relation)] valueArr:@[value] uid:uid];
+    }
+   return NO;
+}
+
++(BOOL)deleteModeInTabel:(Class)cls columnNameArr:(NSArray<NSString *> *)columnNameArr  relationArr:(NSArray<NSNumber *> *)relationArr  valueArr:(NSArray *)valueArr uid:(NSString *)uid{
+    
+    //1. 更新所有的表 if need
+    BOOL rst = [self prepareAccessTable:cls uid:uid];
+    if (rst == NO) {
+        return NO;
+    }
+    
+    if (!(columnNameArr.count == relationArr.count  && relationArr.count == valueArr.count)) {
+        return NO;
+    }
+    
+    NSString *tableName = [YRModeTool tableName:cls];
+    if (tableName.length == 0) {
+        return NO;
+    }
+    
+    NSMutableArray<NSString *> *columnRelationArrM = [NSMutableArray array];
+    NSDictionary *relationDic  = [self relationDic];
+    for(int i= 0 ; i < columnNameArr.count ; i++){
+        NSString *name = columnNameArr[i];
+        NSString *relationStr = relationDic[relationArr[i]];
+        id value = valueArr[i];
+        NSString *columnRelation = [NSString stringWithFormat:@"%@ %@ '%@'",name,relationStr,value ];
+        [columnRelationArrM addObject:columnRelation];
+    }
+    
+
+    
+    NSString *deleteSql = nil;
+    if (columnRelationArrM.count == 0) {
+      deleteSql =  [NSString stringWithFormat:@"delete from %@;",tableName];
+    }
+    
+    if (columnRelationArrM.count == 1) {
+        deleteSql =  [NSString stringWithFormat:@"delete from %@ where %@;",tableName,columnRelationArrM.firstObject];
+    }
+    
+    if (columnRelationArrM.count > 1) {
+        deleteSql =  [NSString stringWithFormat:@"delete from %@ where %@;",tableName,[columnRelationArrM componentsJoinedByString:@" and "]];
+    }
+    
+   return  [YRSqliteTool dealSql:deleteSql uid:uid];
+}
+
 
 #pragma mark- 私有方法
-
-
 +(NSString *)fetchUpdateOrInsertSql:(id)mode uid:(NSString *)uid{
     Class cls = [mode class];
     NSString *updateOrInserColumnSql = nil;
     
     //3. 判断记录是否存在,存在执行更新,不存在执行插入语句
-    NSMutableArray<NSMutableDictionary *> *dicArrM =  [self queryTable:cls uid:uid];
+    NSArray  *modeArr  =  [self queryModeInTable:cls uid:uid];
     NSString *tableName = [YRModeTool tableName:cls];
     
     //4. update 表明 set 字段1=字段1值, 字段二=字段2值 ... where 字段=字段值
     NSDictionary *nameValueDic = [YRModeTool ivarNameValueDicOfMode:mode];
     NSString *primaryKey = [cls modifyPrimaryKey];
     BOOL isNeedUpdate = NO;
-    for (NSDictionary *dic in dicArrM) {
-        if ([dic[primaryKey] isEqual: nameValueDic[primaryKey]]) {
+    for (id m in modeArr) {
+        id value = [m valueForKeyPath:primaryKey];
+        if (value && [value isEqual: nameValueDic[primaryKey]]) {
             isNeedUpdate = YES;
             break;
         }
@@ -304,6 +454,18 @@
     }
     return updateOrInserColumnSql;
 }
+/** 对 数据库进行 增 查 删 改 前 要对数据库的表状态进行 确认*/
++(BOOL)prepareAccessTableArr:(NSArray<Class> *)tableArr  uid:(NSString *)uid{
+    
+    for (Class cls in tableArr) {
+        BOOL rst = [self prepareAccessTable:cls uid:uid];
+        if (rst == NO) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
 /** 对 数据库进行 增 查 删 改 前 要对数据库的表状态进行 确认*/
 +(BOOL)prepareAccessTable:(Class)cls  uid:(NSString *)uid{
     

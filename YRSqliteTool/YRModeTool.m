@@ -100,6 +100,23 @@
     return nameTypeDicM;
 }
 
++(id)modeOfClass:(Class)cls fromDic:(NSDictionary *)dic{
+    
+    NSDictionary *nameSqliteDic = [self classIvarNameSqliteTypeDic:cls];
+    NSDictionary *defaultValueDic = [self sqliteTypeDefaultValueDic];
+    
+    NSArray<NSString *> *nameArr = [self classIvarNameTypeDic:cls].allKeys;
+    id mode = [[cls alloc]init];
+    for (NSString *name in nameArr) {
+        id value = dic[name];
+        if (value == nil) {
+            value = defaultValueDic[nameSqliteDic[name]];
+        }
+        [mode setValue:value forKey:name];
+    }
+    return mode;
+}
+
 #pragma mark- 私有方法
 /** 获取指定Class的所有成员变量名和对应的类型(runtimeType)*/
 +(NSMutableDictionary *)classIvarNameTypeDic:(Class)cls{
