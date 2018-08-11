@@ -50,8 +50,8 @@
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
     
     YRTest *testMode = [YRTest new];
-    testMode.name = @"wangwu";
-    testMode.num = 22;
+    testMode.name = @"wangwu111";
+    testMode.num = 92;
     testMode.age122 = 20;
     testMode.height1 = 1.78;
     testMode.isMan1 = YES;
@@ -65,8 +65,8 @@
 //    BOOL result = [YRSqliteModeTool createTable:[YRTest class] uid:@"yangrui"];
 //    NSLog(@"result: %d",result);
     
-     BOOL rst =[YRSqliteModeTool updateTable:[YRTest class] uid:@"yangrui"];
-     NSLog(@"rst: %d",rst);
+//     BOOL rst =[YRSqliteModeTool updateTable:[YRTest class] uid:@"yangrui"];
+//     NSLog(@"rst: %d",rst);
 //
 //    NSMutableArray *arrM0 = [YRModeTool sortedColumnNames:[YRTest class]];
 //    NSLog(@"arrM0: %@",arrM0);

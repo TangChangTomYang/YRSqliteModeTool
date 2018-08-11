@@ -70,9 +70,7 @@
     if(![self isModeNeedUpdateTable:cls uid:uid] ) {
         return YES;
     }
-    #ifdef DEBUG
-    NSLog(@"正在更新 数据库表结构: %@ ...",cls);
-    #endif
+   
 
     NSMutableArray<NSString *>*sqlArrM = [NSMutableArray array];
     
@@ -81,7 +79,16 @@
     if(tempTableName.length == 0){
         return NO;
     }
-    NSString *createTempTableSql = [NSString stringWithFormat:@"create table if not exists %@(%@,%@);",tempTableName,[YRModeTool defaultPrimaryKeyColumn], [YRModeTool columnNameAndSqliteTypeStr:cls]];
+    
+    NSString *columnInfo = [YRModeTool columnNameAndSqliteTypeStr:cls];
+    if (columnInfo.length == 0) {
+        return NO;
+    }
+    #ifdef DEBUG
+    NSLog(@"正在更新 数据库表结构: %@ ...",cls);
+    #endif
+    NSString *createTempTableSql = [NSString stringWithFormat:@"create table if not exists %@(%@,%@);",tempTableName,[YRModeTool defaultPrimaryKeyColumn],columnInfo ];
+    
     [sqlArrM addObject:createTempTableSql];
     
     //2.根据主键插入数据到临时表
@@ -433,6 +440,7 @@
         [nameValueDic enumerateKeysAndObjectsUsingBlock:^(NSString *name, id value, BOOL * _Nonnull stop) {
         
             if([value isKindOfClass:[NSString class]] && [((NSString *)value) containsString:@"'"]){
+                // 
                 #ifdef DEBUG
                 NSLog(@"更新sql, %@ 类 的 %@ 字段 : \"%@\" 时,发现包含非法字符单引号 (')",cls,name,value);
                 #endif
