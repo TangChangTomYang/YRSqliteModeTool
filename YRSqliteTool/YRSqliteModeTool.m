@@ -426,11 +426,28 @@
         }
     }
     
-    if (isNeedUpdate) {
+    __block BOOL isSqlOk = YES;
+    if (isNeedUpdate) { // 更新
+        
         NSMutableArray *setArrM = [NSMutableArray array];
         [nameValueDic enumerateKeysAndObjectsUsingBlock:^(NSString *name, id value, BOOL * _Nonnull stop) {
+        
+            if([value isKindOfClass:[NSString class]] && [((NSString *)value) containsString:@"'"]){
+                #ifdef DEBUG
+                NSLog(@"更新sql, %@ 类 的 %@ 字段 : \"%@\" 时,发现包含非法字符单引号 (')",cls,name,value);
+                #endif
+                isSqlOk = NO;
+                *stop = YES;
+            }
+        
+            
             [setArrM addObject:[NSString stringWithFormat:@"%@='%@'",name,value]]; ;
         }];
+        
+        if (isSqlOk == NO) {
+            // 字符串中包含了不能包含的 单引号 '
+            return nil;
+        }
         NSString *setStr = [setArrM componentsJoinedByString:@","];
         
         
@@ -443,10 +460,24 @@
         NSMutableArray *nameArrM = [NSMutableArray array];
         NSMutableArray *valueArrM = [NSMutableArray array];
         [nameValueDic enumerateKeysAndObjectsUsingBlock:^(NSString *name, id value, BOOL * _Nonnull stop) {
+            
+            if([value isKindOfClass:[NSString class]] && [((NSString *)value) containsString:@"'"]){
+                #ifdef DEBUG
+                NSLog(@"插入sql, %@ 类 的 %@ 字段 : \"%@\" 时,发现包含非法字符单引号 (')",cls,name,value);
+                #endif
+                isSqlOk = NO;
+                *stop = YES;
+            }
             [nameArrM addObject:name];
             [valueArrM addObject:value];
+            
+            
         }];
         
+        if (isSqlOk == NO) {
+            // 字符串中包含了不能包含的 单引号 '
+            return nil;
+        }
         NSString *namesStr = [NSString stringWithFormat:@"(%@)",[nameArrM componentsJoinedByString:@","]];
         NSString *valuesStr = [NSString stringWithFormat:@"('%@')",[valueArrM componentsJoinedByString:@"','"]];
         NSString *insertSql = [NSString stringWithFormat:@"insert into %@ %@ values %@;",tableName, namesStr, valuesStr];
